@@ -1,9 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import logoImage from "../../public/logo.png";
+import { obterUsuarioLogado, logout, atualizarPerfil } from "../../action/auth";
+import {
+  listarCursos,
+  obterProgressoUsuario,
+  alternarInscricao,
+  alternarAulaConcluida,
+} from "../../action/cursos";
 
 interface Aula {
   id: string;
@@ -28,69 +35,102 @@ interface PerfilUsuario {
 }
 
 export default function Dashboard() {
+  const router = useRouter();
+  const [carregando, setCarregando] = useState(true);
   const [abaAtiva, setAbaAtiva] = useState<"painel" | "cursos" | "configuracoes">("painel");
   const [cursoSelecionadoId, setCursoSelecionadoId] = useState<string | null>(null);
+  
   const [perfil, setPerfil] = useState<PerfilUsuario>({
-    nome: "Gustavo de Paula",
-    email: "gustav.21x@gmail.com",
-    empresa: "EnsinosTech Consultoria",
-    papel: "Administrador / Empreendedor",
+    nome: "",
+    email: "",
+    empresa: "",
+    papel: "Empreendedor",
   });
-  const [listaCursos] = useState<Curso[]>([
-    {
-      id: "c1",
-      categoria: "Formalização",
-      titulo: "Descomplicando o MEI da Empresa",
-      descricao: "Passo a passo completo para abertura, emissão de notas e obrigações legais sem burocracia.",
-      icone: "📋",
-      aulas: [
-        { id: "a1-1", titulo: "Introdução ao MEI e Regras Gerais", duracao: "15 min" },
-        { id: "a1-2", titulo: "Documentação Necessária para Abertura", duracao: "22 min" },
-        { id: "a1-3", titulo: "Emitindo sua Primeira Nota Fiscal Eletrônica", duracao: "30 min" },
-      ],
-    },
-    {
-      id: "c2",
-      categoria: "Marketing",
-      titulo: "Marketing Digital de Atração",
-      descricao: "Como estruturar o posicionamento digital da sua marca para atrair clientes organicamente.",
-      icone: "📣",
-      aulas: [
-        { id: "a2-1", titulo: "Definição de Público-Alvo e Persona", duracao: "18 min" },
-        { id: "a2-2", titulo: "Configurando Redes Sociais Profissionais", duracao: "25 min" },
-        { id: "a2-3", titulo: "Estratégias Básicas de Tráfego Orgânico", duracao: "20 min" },
-      ],
-    },
-    {
-      id: "c3",
-      categoria: "Segurança",
-      titulo: "Segurança Digital Corporativa",
-      descricao: "Proteção de dados críticos, engenharia social e conformidade essencial para microempresas.",
-      icone: "🛡️",
-      aulas: [
-        { id: "a3-1", titulo: "Princípios da Segurança da Informação", duracao: "12 min" },
-        { id: "a3-2", titulo: "Gerenciamento Seguro de Senhas e Acessos", duracao: "19 min" },
-        { id: "a3-3", titulo: "Evitando Golpes Comuns no Meio Digital", duracao: "28 min" },
-      ],
-    },
-  ]);
-  const [cursosInscritos, setCursosInscritos] = useState<string[]>(["c1"]);
-  const [aulasConcluidas, setAulasConcluidas] = useState<string[]>(["a1-1"]);
+  
+  const [listaCursos, setListaCursos] = useState<Curso[]>([]);
+  const [cursosInscritos, setCursosInscritos] = useState<string[]>([]);
+  const [aulasConcluidas, setAulasConcluidas] = useState<string[]>([]);
 
-  // Funções de Inscrição
-  const alternarInscricao = (cursoId: string) => {
-    if (cursosInscritos.includes(cursoId)) {
-      setCursosInscritos(cursosInscritos.filter((id) => id !== cursoId));
-      if (cursoSelecionadoId === cursoId) setCursoSelecionadoId(null);
-    } else {
-      setCursosInscritos([...cursosInscritos, cursoId]);
+  // Carrega todos os dados do banco de dados na inicialização
+  useEffect(() => {
+    async function carregarDados() {
+      try {
+        const usuario = await obterUsuarioLogado();
+        if (!usuario) {
+          router.push("/login");
+          return;
+        }
+
+        setPerfil({
+          nome: usuario.nome,
+          email: usuario.email,
+          empresa: usuario.empresa || "",
+          papel: usuario.papel,
+        });
+
+        const cursos = await listarCursos();
+        setListaCursos(cursos as Curso[]);
+
+        const progresso = await obterProgressoUsuario();
+        setCursosInscritos(progresso.cursosInscritos);
+        setAulasConcluidas(progresso.aulasConcluidas);
+      } catch (err) {
+        console.error("Erro ao inicializar dashboard:", err);
+      } finally {
+        setCarregando(false);
+      }
+    }
+    carregarDados();
+  }, [router]);
+
+  // Função para se inscrever ou cancelar inscrição
+  const handleAlternarInscricao = async (cursoId: string) => {
+    try {
+      const res = await alternarInscricao(cursoId);
+      if (res.sucesso) {
+        const progresso = await obterProgressoUsuario();
+        setCursosInscritos(progresso.cursosInscritos);
+        setAulasConcluidas(progresso.aulasConcluidas);
+        if (!res.inscrito && cursoSelecionadoId === cursoId) {
+          setCursoSelecionadoId(null);
+        }
+      } else if (res.erro) {
+        alert(res.erro);
+      }
+    } catch (err) {
+      console.error(err);
     }
   };
-  const alternarAulaConcluida = (aulaId: string) => {
-    if (aulasConcluidas.includes(aulaId)) {
-      setAulasConcluidas(aulasConcluidas.filter((id) => id !== aulaId));
-    } else {
-      setAulasConcluidas([...aulasConcluidas, aulaId]);
+
+  // Função para marcar/desmarcar aula concluída
+  const handleAlternarAulaConcluida = async (aulaId: string) => {
+    try {
+      const res = await alternarAulaConcluida(aulaId);
+      if (res.sucesso) {
+        const progresso = await obterProgressoUsuario();
+        setAulasConcluidas(progresso.aulasConcluidas);
+      } else if (res.erro) {
+        alert(res.erro);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Função para salvar alterações no perfil
+  const handleSalvarPerfil = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    try {
+      const res = await atualizarPerfil(formData);
+      if (res.sucesso) {
+        alert(res.mensagem || "Perfil atualizado com sucesso!");
+      } else if (res.erro) {
+        alert(res.erro);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao atualizar o perfil.");
     }
   };
 
@@ -101,8 +141,25 @@ export default function Dashboard() {
     return Math.round((concluidasNoCurso.length / aulasDoCurso.length) * 100);
   };
 
+  if (carregando) {
+    return (
+      <div className="min-h-screen bg-[#f4f5f4] flex flex-col items-center justify-center font-sans antialiased text-[#1b4326]">
+        <div className="relative w-20 h-20 mb-4 animate-bounce">
+          <Image src={logoImage} alt="Logo" fill className="object-contain" />
+        </div>
+        <p className="text-lg font-extrabold tracking-tight">Carregando ambiente de estudos...</p>
+        <div className="mt-4 w-40 bg-gray-200 h-1.5 rounded-full overflow-hidden">
+          <div className="bg-[#88D66C] h-1.5 rounded-full animate-pulse w-full"></div>
+        </div>
+      </div>
+    );
+  }
+
   const totalAulasExistentes = listaCursos.reduce((acc, c) => acc + c.aulas.length, 0);
-  const progressoGeralPlataforma = Math.round((aulasConcluidas.length / totalAulasExistentes) * 100);
+  const progressoGeralPlataforma = totalAulasExistentes > 0 
+    ? Math.round((aulasConcluidas.length / totalAulasExistentes) * 100) 
+    : 0;
+  
   const cursoAtivoParaExibicao = listaCursos.find((c) => c.id === cursoSelecionadoId);
   const cursosAtivos = listaCursos.filter(c => cursosInscritos.includes(c.id));
   const cursosSugeridos = listaCursos.filter(c => !cursosInscritos.includes(c.id));
@@ -120,7 +177,7 @@ export default function Dashboard() {
         <nav className="flex-1 p-4 flex flex-col gap-1.5">
           <button
             onClick={() => { setAbaAtiva("painel"); setCursoSelecionadoId(null); }}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition text-left w-full ${
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition text-left w-full cursor-pointer ${
               abaAtiva === "painel" && !cursoSelecionadoId
                 ? "bg-[#f2fcf5] text-[#1b4326]"
                 : "text-gray-600 hover:bg-gray-50 hover:text-[#1b4326]"
@@ -131,7 +188,7 @@ export default function Dashboard() {
 
           <button
             onClick={() => { setAbaAtiva("cursos"); setCursoSelecionadoId(null); }}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition text-left w-full ${
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition text-left w-full cursor-pointer ${
               abaAtiva === "cursos"
                 ? "bg-[#f2fcf5] text-[#1b4326]"
                 : "text-gray-600 hover:bg-gray-50 hover:text-[#1b4326]"
@@ -142,7 +199,7 @@ export default function Dashboard() {
 
           <button
             onClick={() => { setAbaAtiva("configuracoes"); setCursoSelecionadoId(null); }}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition text-left w-full ${
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition text-left w-full cursor-pointer ${
               abaAtiva === "configuracoes"
                 ? "bg-[#f2fcf5] text-[#1b4326]"
                 : "text-gray-600 hover:bg-gray-50 hover:text-[#1b4326]"
@@ -155,11 +212,18 @@ export default function Dashboard() {
         <div className="p-4 border-t border-gray-100 bg-gray-50/50">
           <div className="flex items-center gap-3 px-2 py-1">
             <div className="w-9 h-9 rounded-full bg-[#1b4326] flex items-center justify-center text-white text-xs font-bold uppercase shadow-sm">
-              {perfil.nome.substring(0, 2)}
+              {perfil.nome ? perfil.nome.substring(0, 2) : "US"}
             </div>
             <div className="flex flex-col overflow-hidden">
               <span className="text-xs font-bold text-[#1b4326] truncate">{perfil.nome}</span>
-              <Link href="/" className="text-[10px] text-red-500 font-extrabold hover:underline">Sair da Plataforma</Link>
+              <button 
+                onClick={async () => {
+                  await logout();
+                }}
+                className="text-[10px] text-red-500 font-extrabold hover:underline text-left cursor-pointer"
+              >
+                Sair da Plataforma
+              </button>
             </div>
           </div>
         </div>
@@ -174,7 +238,7 @@ export default function Dashboard() {
                 <p className="text-sm text-gray-500 font-semibold mt-0.5">Acompanhe seu avanço no projeto Conecta Empreendedor.</p>
               </div>
               <div className="bg-white border border-gray-200 text-[#1b4326] px-4 py-2 rounded-xl text-xs font-bold shadow-sm hidden md:block">
-                Ambiente Acadêmico UPx 5
+                Ambiente Acadêmico
               </div>
             </header>
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
@@ -215,7 +279,7 @@ export default function Dashboard() {
                       </p>
                       <button 
                         onClick={() => setCursoSelecionadoId(cursosAtivos[0].id)}
-                        className="bg-white text-[#1b4326] px-8 py-3 rounded-xl text-sm font-bold hover:bg-gray-100 transition shadow"
+                        className="bg-white text-[#1b4326] px-8 py-3 rounded-xl text-sm font-bold hover:bg-gray-100 transition shadow cursor-pointer"
                       >
                         Retomar Trilha →
                       </button>
@@ -237,7 +301,7 @@ export default function Dashboard() {
                       <p className="text-sm text-gray-500 mb-6 max-w-md">Para começar a aprender e gerenciar seu progresso, escolha um curso no catálogo.</p>
                       <button 
                         onClick={() => setAbaAtiva("cursos")}
-                        className="bg-[#1b4326] text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-[#112e19] transition shadow-sm"
+                        className="bg-[#1b4326] text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-[#112e19] transition shadow-sm cursor-pointer"
                       >
                         Explorar Catálogo de Cursos
                       </button>
@@ -250,7 +314,7 @@ export default function Dashboard() {
                           <div 
                             key={curso.id} 
                             onClick={() => setCursoSelecionadoId(curso.id)}
-                            className="bg-white p-6 rounded-3xl border border-gray-100 flex flex-col justify-between shadow-sm hover:shadow-md hover:border-[#88D66C]/50 transition cursor-pointer group"
+                            className="bg-white p-6 rounded-3xl border border-gray-100 flex flex-col justify-between shadow-sm hover:shadow-md hover:border-[#88D66C]/50 transition cursor-pointer group animate-fadeIn"
                           >
                             <div>
                               <div className="flex justify-between items-start mb-4">
@@ -296,7 +360,7 @@ export default function Dashboard() {
                       <span className="text-[9px] font-bold text-gray-400 uppercase mt-1 block">Há 1 dia</span>
                     </div>
                   </div>
-                  <button className="w-full text-center mt-5 text-xs font-bold text-[#1b4326] bg-gray-50 py-2 rounded-xl hover:bg-gray-100 transition">
+                  <button className="w-full text-center mt-5 text-xs font-bold text-[#1b4326] bg-gray-50 py-2 rounded-xl hover:bg-gray-100 transition cursor-pointer">
                     Ver todos os avisos
                   </button>
                 </div>
@@ -307,7 +371,11 @@ export default function Dashboard() {
                     </h3>
                     <div className="space-y-4">
                       {cursosSugeridos.slice(0, 2).map(curso => (
-                        <div key={curso.id} className="flex gap-4 items-center p-3 rounded-2xl hover:bg-gray-50 transition cursor-pointer border border-transparent hover:border-gray-100" onClick={() => setAbaAtiva("cursos")}>
+                        <div 
+                          key={curso.id} 
+                          className="flex gap-4 items-center p-3 rounded-2xl hover:bg-gray-50 transition cursor-pointer border border-transparent hover:border-gray-100" 
+                          onClick={() => setAbaAtiva("cursos")}
+                        >
                           <div className="text-3xl bg-gray-50 p-2 rounded-xl">{curso.icone}</div>
                           <div>
                             <h4 className="text-xs font-bold text-gray-800 line-clamp-1">{curso.titulo}</h4>
@@ -318,7 +386,7 @@ export default function Dashboard() {
                     </div>
                     <button 
                       onClick={() => setAbaAtiva("cursos")}
-                      className="w-full text-center mt-4 text-xs font-bold text-white bg-[#1b4326] py-2.5 rounded-xl hover:bg-[#112e19] transition shadow-sm"
+                      className="w-full text-center mt-4 text-xs font-bold text-white bg-[#1b4326] py-2.5 rounded-xl hover:bg-[#112e19] transition shadow-sm cursor-pointer"
                     >
                       Explorar Mais Trilhas
                     </button>
@@ -332,7 +400,7 @@ export default function Dashboard() {
           <div className="max-w-[1200px] mx-auto animate-fadeIn">
             <button 
               onClick={() => setCursoSelecionadoId(null)}
-              className="mb-6 text-sm font-bold text-[#1b4326] hover:bg-white hover:shadow-sm px-4 py-2 rounded-xl border border-transparent hover:border-gray-200 transition flex items-center gap-2"
+              className="mb-6 text-sm font-bold text-[#1b4326] hover:bg-white hover:shadow-sm px-4 py-2 rounded-xl border border-transparent hover:border-gray-200 transition flex items-center gap-2 cursor-pointer"
             >
               ← Voltar para o Painel Geral
             </button>
@@ -357,8 +425,8 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <button 
-                  onClick={() => alternarInscricao(cursoAtivoParaExibicao.id)}
-                  className="w-full mt-8 text-xs font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 py-3 rounded-xl transition"
+                  onClick={() => handleAlternarInscricao(cursoAtivoParaExibicao.id)}
+                  className="w-full mt-8 text-xs font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 py-3 rounded-xl transition cursor-pointer"
                 >
                   Cancelar Inscrição neste Curso
                 </button>
@@ -372,7 +440,7 @@ export default function Dashboard() {
                   return (
                     <div 
                       key={aula.id}
-                      className={`p-5 md:p-6 rounded-3xl border transition flex flex-col md:flex-row md:justify-between md:items-center gap-4 ${
+                      className={`p-5 md:p-6 rounded-3xl border transition flex flex-col md:flex-row md:justify-between md:items-center gap-4 animate-fadeIn ${
                         concluida 
                           ? "bg-[#f2fcf5] border-green-200 shadow-sm" 
                           : "bg-white border-gray-100 shadow-sm hover:border-gray-300"
@@ -393,8 +461,8 @@ export default function Dashboard() {
                       </div>
 
                       <button
-                        onClick={() => alternarAulaConcluida(aula.id)}
-                        className={`px-6 py-3 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-2 w-full md:w-auto shadow-sm ${
+                        onClick={() => handleAlternarAulaConcluida(aula.id)}
+                        className={`px-6 py-3 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-2 w-full md:w-auto shadow-sm cursor-pointer ${
                           concluida
                             ? "bg-[#1b4326] text-white hover:bg-[#112e19]"
                             : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
@@ -420,7 +488,7 @@ export default function Dashboard() {
               {listaCursos.map((curso) => {
                 const inscrito = cursosInscritos.includes(curso.id);
                 return (
-                  <div key={curso.id} className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm flex flex-col justify-between hover:shadow-md transition">
+                  <div key={curso.id} className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm flex flex-col justify-between hover:shadow-md transition animate-fadeIn">
                     <div>
                       <div className="flex justify-between items-start mb-5">
                         <div className="text-5xl">{curso.icone}</div>
@@ -440,8 +508,8 @@ export default function Dashboard() {
                       
                       <div className="flex gap-3">
                         <button 
-                          onClick={() => alternarInscricao(curso.id)}
-                          className={`flex-1 py-3 rounded-xl text-xs font-bold transition shadow-sm border ${
+                          onClick={() => handleAlternarInscricao(curso.id)}
+                          className={`flex-1 py-3 rounded-xl text-xs font-bold transition shadow-sm border cursor-pointer ${
                             inscrito 
                               ? "bg-white text-red-500 border-red-100 hover:bg-red-50" 
                               : "bg-[#1b4326] text-white border-transparent hover:bg-[#112e19]"
@@ -453,7 +521,7 @@ export default function Dashboard() {
                         {inscrito && (
                           <button 
                             onClick={() => { setAbaAtiva("painel"); setCursoSelecionadoId(curso.id); }}
-                            className="flex-1 bg-[#88D66C] text-[#1b4326] py-3 rounded-xl text-xs font-extrabold hover:bg-[#7bc260] transition shadow-sm border border-transparent"
+                            className="flex-1 bg-[#88D66C] text-[#1b4326] py-3 rounded-xl text-xs font-extrabold hover:bg-[#7bc260] transition shadow-sm border border-transparent cursor-pointer"
                           >
                             Acessar Aulas
                           </button>
@@ -476,14 +544,16 @@ export default function Dashboard() {
             <div className="bg-white p-8 md:p-10 rounded-3xl border border-gray-100 shadow-sm">
               <h3 className="text-lg font-bold text-[#1b4326] mb-6 border-b border-gray-50 pb-4">Dados Cadastrais</h3>
               
-              <form onSubmit={(e) => e.preventDefault()} className="flex flex-col gap-6">
+              <form onSubmit={handleSalvarPerfil} className="flex flex-col gap-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-[11px] font-extrabold text-gray-400 uppercase tracking-wider mb-2">Nome Completo</label>
                     <input 
                       type="text" 
+                      name="nome"
                       value={perfil.nome}
                       onChange={(e) => setPerfil({...perfil, nome: e.target.value})}
+                      required
                       className="w-full px-5 py-3.5 rounded-xl bg-gray-50 border border-gray-200 text-sm font-bold text-gray-800 focus:outline-none focus:bg-white focus:border-[#88D66C] focus:ring-2 focus:ring-[#88D66C]/20 transition"
                     />
                   </div>
@@ -491,8 +561,10 @@ export default function Dashboard() {
                     <label className="block text-[11px] font-extrabold text-gray-400 uppercase tracking-wider mb-2">E-mail de Acesso</label>
                     <input 
                       type="email" 
+                      name="email"
                       value={perfil.email}
                       onChange={(e) => setPerfil({...perfil, email: e.target.value})}
+                      required
                       className="w-full px-5 py-3.5 rounded-xl bg-gray-50 border border-gray-200 text-sm font-bold text-gray-800 focus:outline-none focus:bg-white focus:border-[#88D66C] focus:ring-2 focus:ring-[#88D66C]/20 transition"
                     />
                   </div>
@@ -502,6 +574,7 @@ export default function Dashboard() {
                   <label className="block text-[11px] font-extrabold text-gray-400 uppercase tracking-wider mb-2">Nome do Seu Negócio</label>
                   <input 
                     type="text" 
+                    name="empresa"
                     value={perfil.empresa}
                     onChange={(e) => setPerfil({...perfil, empresa: e.target.value})}
                     className="w-full px-5 py-3.5 rounded-xl bg-gray-50 border border-gray-200 text-sm font-bold text-gray-800 focus:outline-none focus:bg-white focus:border-[#88D66C] focus:ring-2 focus:ring-[#88D66C]/20 transition"
@@ -520,9 +593,8 @@ export default function Dashboard() {
 
                 <div className="border-t border-gray-100 pt-6 mt-2 flex justify-end">
                   <button 
-                    type="button"
-                    onClick={() => alert("Os dados do estado local foram atualizados. Quando o Prisma for configurado, usaremos um UPDATE aqui.")}
-                    className="bg-[#1b4326] text-white px-8 py-3 rounded-xl text-sm font-bold hover:bg-[#112e19] transition shadow-md"
+                    type="submit"
+                    className="bg-[#1b4326] text-white px-8 py-3 rounded-xl text-sm font-bold hover:bg-[#112e19] transition shadow-md cursor-pointer"
                   >
                     Salvar Modificações
                   </button>
