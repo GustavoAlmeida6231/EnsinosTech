@@ -1,9 +1,40 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import logoImage from "../../public/logo.png";
 import bg2Image from "../../public/backg.png";
+import { login } from "../../action/auth";
 
 export default function Login() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [sucesso, setSucesso] = useState<string | null>(null);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoading(true);
+    setErro(null);
+    setSucesso(null);
+
+    const formData = new FormData(event.currentTarget);
+    const resultado = await login(formData);
+
+    setLoading(false);
+
+    if (resultado?.erro) {
+      setErro(resultado.erro);
+    } else if (resultado?.sucesso) {
+      setSucesso(resultado.mensagem || "Login efetuado com sucesso!");
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 1000);
+    }
+  }
+
   return (
     <main className="min-h-screen relative flex flex-col justify-center items-center p-4">
       <div className="absolute inset-0 z-0">
@@ -27,7 +58,7 @@ export default function Login() {
         </Link>
       </div>
       <div className="relative z-10 bg-white p-10 rounded-3xl shadow-2xl w-full max-w-md border border-gray-100 transition-all">
-        <div className="flex flex-col items-center mb-10 text-center">
+        <div className="flex flex-col items-center mb-8 text-center">
           <div className="relative w-16 h-16 mb-4">
             <Image src={logoImage} alt="Logo EnsinosTech" fill className="object-contain" />
           </div>
@@ -38,13 +69,29 @@ export default function Login() {
             Seu próximo passo começa aqui. Bem-vindo de volta!
           </p>
         </div>
-        <form className="flex flex-col gap-6">
+
+        {erro && (
+          <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-bold animate-fadeIn">
+            ⚠️ {erro}
+          </div>
+        )}
+
+        {sucesso && (
+          <div className="mb-6 p-4 rounded-xl bg-green-50 border border-green-200 text-green-800 text-sm font-bold animate-fadeIn">
+            ✅ {sucesso}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
           <div>
             <label className="block text-sm font-bold text-[#1b4326] mb-1.5">
               E-mail
             </label>
             <input
+              name="email"
               type="email"
+              required
+              disabled={loading}
               placeholder="seu@email.com"
               className="w-full px-4 py-3 rounded-xl bg-[#f2fcf5] border border-gray-200 focus:outline-none focus:border-[#88D66C] focus:ring-2 focus:ring-[#88D66C]/20 transition"
             />
@@ -55,7 +102,10 @@ export default function Login() {
               Senha
             </label>
             <input
+              name="senha"
               type="password"
+              required
+              disabled={loading}
               placeholder="••••••••"
               className="w-full px-4 py-3 rounded-xl bg-[#f2fcf5] border border-gray-200 focus:outline-none focus:border-[#88D66C] focus:ring-2 focus:ring-[#88D66C]/20 transition"
             />
@@ -66,18 +116,22 @@ export default function Login() {
             </div>
           </div>
 
-          <Link href="/dashboard" className="w-full bg-[#1b4326] text-white py-3.5 rounded-xl font-extrabold text-base hover:bg-[#112e19] transition shadow-md mt-4 flex items-center justify-center">
-            Entrar
-          </Link>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-[#1b4326] text-white py-3.5 rounded-xl font-extrabold text-base hover:bg-[#112e19] transition shadow-md mt-4 flex items-center justify-center disabled:opacity-55"
+          >
+            {loading ? "Entrando..." : "Entrar"}
+          </button>
         </form>
-        <div className="flex flex-col items-center gap-4 mt-10">
+        <div className="flex flex-col items-center gap-4 mt-8">
           <div className="flex items-center gap-4 w-full">
             <div className="flex-1 h-px bg-gray-200"></div>
             <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">ou</span>
             <div className="flex-1 h-px bg-gray-200"></div>
           </div>
 
-          <button className="flex items-center justify-center gap-3 w-full border border-gray-300 py-3 rounded-lg font-bold text-[#1b4326] hover:bg-neutral-50 transition">
+          <button className="flex items-center justify-center gap-3 w-full border border-gray-300 py-3 rounded-lg font-bold text-[#1b4326] hover:bg-neutral-50 transition cursor-pointer">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 48 48">
               <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.954,4,4,12.954,4,24s8.954,20,20,20s20-8.954,20-20C44,22.659,43.862,21.35,43.611,20.083z" />
               <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z" />
@@ -87,7 +141,7 @@ export default function Login() {
             Entrar com Google
           </button>
         </div>
-        <div className="mt-10 text-center">
+        <div className="mt-8 text-center">
           <p className="text-sm text-[#1b4326] font-medium opacity-90 lowercase leading-snug">
             Ainda não tem conta?{" "}
             <br />
