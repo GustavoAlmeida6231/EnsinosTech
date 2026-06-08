@@ -44,10 +44,10 @@ export default function Home() {
         </div>
 
         <div className="hidden md:flex gap-8 text-[#1b4326] text-sm font-bold">
-          <a href="#" className="hover:text-green-600 transition">Trilhas</a>
-          <a href="#" className="hover:text-green-600 transition">Cursos</a>
-          <a href="#" className="hover:text-green-600 transition">Comunidade</a>
-          <a href="#" className="hover:text-green-600 transition">Apoio</a>
+          <Link href="/trilhas" className="hover:text-green-600 transition">Trilhas</Link>
+          <Link href="/cursos" className="hover:text-green-600 transition">Cursos</Link>
+          <Link href="/comunidade" className="hover:text-green-600 transition">Comunidade</Link>
+          <Link href="/apoio" className="hover:text-green-600 transition">Apoio</Link>
         </div>
 
         <div className="flex gap-3">
@@ -133,9 +133,9 @@ export default function Home() {
               <p className="font-bold text-[15px] lowercase">ainda não tem cadastro?</p>
               <p className="text-[12px] lowercase opacity-90">crie sua conta gratuitamente e tenha acesso a todo conteudo</p>
             </div>
-            <button className="bg-[#88D66C] text-[#1b4326] px-5 py-2 rounded-md text-sm font-bold hover:bg-[#7bc260] transition shadow-sm">
+            <Link href="/cadastro" className="bg-[#88D66C] text-[#1b4326] px-5 py-2 rounded-md text-sm font-bold hover:bg-[#7bc260] transition shadow-sm flex items-center justify-center">
               Criar Conta Grátis
-            </button>
+            </Link>
           </div>
           <div className="w-10 h-10 bg-[#f4f5f4] rounded-full flex items-center justify-center z-10 relative shadow-md">
             <span className="font-extrabold text-[#1b4326] text-sm">ou</span>
@@ -145,9 +145,9 @@ export default function Home() {
               <p className="font-bold text-[15px] lowercase">já tem uma conta?</p>
               <p className="text-[12px] lowercase opacity-80">faça o login e continue sua jornada</p>
             </div>
-            <button className="bg-white border border-gray-200 text-[#1b4326] px-6 py-2 rounded-md text-sm font-bold hover:bg-gray-50 transition shadow-sm">
+            <Link href="/login" className="bg-white border border-gray-200 text-[#1b4326] px-6 py-2 rounded-md text-sm font-bold hover:bg-gray-50 transition shadow-sm flex items-center justify-center">
               Entrar
-            </button>
+            </Link>
           </div>
 
         </div>
