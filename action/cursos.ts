@@ -44,8 +44,9 @@ export async function obterProgressoUsuario() {
     });
 
     return {
-      cursosInscritos: inscricoes.map((i) => i.cursoId),
-      aulasConcluidas: concluidas.map((c) => c.aulaId),
+      // Substitua 'Inscricao' pelo nome da sua interface/tipo, se houver
+      cursosInscritos: inscricoes.map((i: any) => i.cursoId), 
+      aulasConcluidas: concluidas.map((c: any) => c.aulaId),
     };
   } catch (error) {
     console.error("Erro ao obter progresso:", error);
